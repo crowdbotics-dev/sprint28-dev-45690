@@ -1,20 +1,66 @@
-import mods from "./*/index.js";
+import React, { useEffect } from "react";
+import {
+  Text,
+  FlatList,
+  View,
+  TouchableOpacity,
+  ImageBackground,
+  SafeAreaView
+} from "react-native";
+import { styles } from "./styles";
+import { slice, articleList } from "./store";
+import { useSelector, useDispatch } from "react-redux";
+import { createStackNavigator } from "@react-navigation/stack";
+import Article from "./article";
 
-export const screens = mods.map(mod => {
-  return Object.assign(mod, {
-    value: {
-      navigator: mod.value,
-      title: mod.name
-    }
-  })
-});
+const ArticlesList = ({ route, navigation }) => {
+  const detail = route.params?.detail || "Article";
+  const articles = useSelector((state) =>
+    Object.entries(state.Articles.articles).map(([, entry]) => entry)
+  );
+  const dispatch = useDispatch();
 
-export function getNavigationScreen(name) {
-  const screen = screens.find(screen => screen.name == name);
+  useEffect(async () => {
+    dispatch(articleList()).catch((e) => console.log(e.message));
+  }, [detail]);
 
-  if (screen) {
-    return screen.name
-  }
+  const renderItem = ({ item }) => (
+    <TouchableOpacity
+      onPress={() => {
+        navigation.navigate(detail, { id: item.id });
+      }}
+    >
+      <ImageBackground source={{ uri: item.image }} style={styles.image}>
+        <View style={styles.card}>
+          <Text style={styles.text}>{item.title}</Text>
+          <Text style={styles.author}>{item.author}</Text>
+        </View>
+      </ImageBackground>
+    </TouchableOpacity>
+  );
 
-  return name
-}
+  return (
+    <SafeAreaView>
+      <FlatList
+        data={articles}
+        renderItem={renderItem}
+        keyExtractor={(item) => `${item.id}`}
+      />
+    </SafeAreaView>
+  );
+};
+
+const Stack = createStackNavigator();
+
+const ArticlesNavigator = () => (
+  <Stack.Navigator headerMode="none" initialRouteName="Articles">
+    <Stack.Screen name="Articles" component={ArticlesList} />
+    <Stack.Screen name="Article" component={Article} />
+  </Stack.Navigator>
+);
+
+export default {
+  title: "Articles",
+  navigator: ArticlesNavigator,
+  slice
+};
