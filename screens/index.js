@@ -1,66 +1,46 @@
 import React, { useEffect } from "react";
-import {
-  Text,
-  FlatList,
-  View,
-  TouchableOpacity,
-  ImageBackground,
-  SafeAreaView
-} from "react-native";
-import { styles } from "./styles";
-import { slice, articleList } from "./store";
-import { useSelector, useDispatch } from "react-redux";
-import { createStackNavigator } from "@react-navigation/stack";
-import Article from "./article";
+import "react-native-gesture-handler";
+import Pubnub from "pubnub";
+// @ts-ignore
+import { PubNubProvider } from "pubnub-react";
+import Navigator from "./Navigator";
+import { useStore, uuid } from "./Store";
+import { listener } from "./utils";
+import options from "./options";
+import { LogBox } from "react-native";
+import { MenuProvider } from "react-native-popup-menu";
 
-const ArticlesList = ({ route, navigation }) => {
-  const detail = route.params?.detail || "Article";
-  const articles = useSelector((state) =>
-    Object.entries(state.Articles.articles).map(([, entry]) => entry)
-  );
-  const dispatch = useDispatch();
+LogBox.ignoreLogs(["Setting a timer"]);
 
-  useEffect(async () => {
-    dispatch(articleList()).catch((e) => console.log(e.message));
-  }, [detail]);
+const client = new Pubnub({
+  subscribeKey: options.PUBNUB_SUB,
+  publishKey: options.PUBNUB_PUB,
+  uuid,
+  restore: true
+});
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity
-      onPress={() => {
-        navigation.navigate(detail, { id: item.id });
-      }}
-    >
-      <ImageBackground source={{ uri: item.image }} style={styles.image}>
-        <View style={styles.card}>
-          <Text style={styles.text}>{item.title}</Text>
-          <Text style={styles.author}>{item.author}</Text>
-        </View>
-      </ImageBackground>
-    </TouchableOpacity>
-  );
+const App = () => {
+  const { state, dispatch } = useStore();
+  useEffect(() => {
+    const userIds = options.users.map((user) => {
+      return user._id;
+    });
+    client.addListener(listener(state, dispatch));
+    client.subscribe({
+      channelGroups: [options.user._id, ...userIds],
+      withPresence: true
+    });
+  }, []);
 
   return (
-    <SafeAreaView>
-      <FlatList
-        data={articles}
-        renderItem={renderItem}
-        keyExtractor={(item) => `${item.id}`}
-      />
-    </SafeAreaView>
+    <PubNubProvider client={client}>
+      <MenuProvider>
+        <Navigator />
+      </MenuProvider>
+    </PubNubProvider>
   );
 };
-
-const Stack = createStackNavigator();
-
-const ArticlesNavigator = () => (
-  <Stack.Navigator headerMode="none" initialRouteName="Articles">
-    <Stack.Screen name="Articles" component={ArticlesList} />
-    <Stack.Screen name="Article" component={Article} />
-  </Stack.Navigator>
-);
-
 export default {
-  title: "Articles",
-  navigator: ArticlesNavigator,
-  slice
+  title: "Chat",
+  navigator: App
 };
